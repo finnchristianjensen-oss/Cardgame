@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Kasino Matador</title>
+    
+    <link rel="icon" type="image/png" href="kasino-ikon.png">
+    <link rel="apple-touch-icon" href="kasino-ikon.png">
+
+    <style>
+        :root { --gold: #ffeb3b; --bg: #0e301b; --card-white: #ffffff; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg); color: white; margin: 0; padding: 5px; display: flex; flex-direction: column; align-items: center; user-select: none; overflow-x: hidden; }
+        
+        .game-header { font-size: 2.5rem; font-weight: 900; color: var(--gold); text-transform: uppercase; letter-spacing: 5px; margin: 10px 0; text-shadow: 3px 3px 0px #d35400; font-style: italic; }
+
+        .main-container { display: flex; flex-direction: row; gap: 15px; width: 100%; max-width: 1100px; justify-content: center; }
+        @media (max-width: 900px) { .main-container { flex-direction: column; align-items: center; } .game-header { font-size: 2rem; } }
+
+        /* Guide boks */
+        .value-guide { background: rgba(0,0,0,0.6); padding: 12px; border-radius: 10px; border: 1px solid var(--gold); min-width: 160px; height: fit-content; }
+        .value-guide h3 { color: var(--gold); margin: 0 0 5px 0; font-size: 0.9rem; text-transform: uppercase; border-bottom: 1px solid var(--gold); }
+        .value-guide ul { list-style: none; padding: 0; margin: 0; font-size: 0.8rem; line-height: 1.5; }
+        .value-guide li b { color: var(--gold); }
+
+        /* Spilområde */
+        .game-area { flex-grow: 1; display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 800px; }
+        .score-board { width: 100%; background: #000; color: var(--gold); display: grid; grid-template-columns: repeat(4, 1fr); padding: 10px; border-radius: 10px; border: 2px solid gold; text-align: center; font-weight: bold; }
+        .status-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; width: 100%; background: rgba(0,0,0,0.8); padding: 8px; border-radius: 10px; margin: 5px 0; }
+        .player-status { text-align: center; font-size: 0.65rem; padding: 4px; border-radius: 5px; border: 1px solid transparent; opacity: 0.5; }
+        .active-turn { border-color: gold; background: rgba(255, 215, 0, 0.2); opacity: 1; box-shadow: 0 0 10px gold; }
+        
+        .board, .hand { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; min-height: 110px; padding: 15px; width: 100%; border: 2px solid rgba(255,255,255,0.1); margin: 5px 0; border-radius: 15px; background: rgba(0,0,0,0.2); box-sizing: border-box; }
+        
+        /* Kort styling */
+        .card { width: 55px; height: 85px; background: var(--card-white); color: black; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: bold; font-size: 1.1rem; box-shadow: 2px 2px 5px rgba(0,0,0,0.5); border: 3px solid transparent; position: relative; cursor: pointer; transition: 0.2s; }
+        .card.selected { border-color: #00ff00; transform: translateY(-10px); box-shadow: 0 0 15px #00ff00; }
+        .card.red { color: #d32f2f; }
+        .card.is-build { border: 2px dashed #ff9800; background: #fffde7; }
+        .special-badge { position: absolute; top: -5px; right: -5px; background: gold; color: black; font-size: 0.5rem; padding: 2px 4px; border-radius: 3px; border: 1px solid black; }
+
+        #msg { height: 30px; color: var(--gold); font-size: 1rem; text-align: center; font-weight: bold; margin: 10px; }
+        .controls { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+        button { padding: 10px 18px; font-size: 0.9rem; border-radius: 8px; border: none; background: #f39c12; color: white; font-weight: bold; cursor: pointer; box-shadow: 0 4px #d35400; }
+        button:active { transform: translateY(2px); box-shadow: 0 2px #d35400; }
+        button:disabled { opacity: 0.3; cursor: not-allowed; box-shadow: none; }
+
+        .modal, .setup-panel { background: rgba(0,0,0,0.95); padding: 25px; border-radius: 15px; border: 3px solid gold; width: 85%; max-width: 350px; text-align: center; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2000; box-shadow: 0 0 40px #000; }
+    </style>
+</head>
+<body>
+
+<h1 class="game-header">KASINO</h1>
+
+<div class="main-container">
+    <div class="value-guide">
+        <h3>Værdier</h3>
+        <ul>
+            <li><b>Esser:</b> 1 / 14</li>
+            <li><b>♦10:</b> 10 / 16</li>
+            <li><b>♠2:</b> 2 / 15</li>
+            <li><b>♠5:</b> Ryd bord</li>
+            <li><b>Billed:</b> 11-13</li>
+        </ul>
+    </div>
+
+    <div class="game-area">
+        <div class="score-board">
+            <div>P1: <span id="total-0">0</span></div>
+            <div>P2: <span id="total-1">0</span></div>
+            <div>P3: <span id="total-2">0</span></div>
+            <div>P4: <span id="total-3">0</span></div>
+        </div>
+
+        <div class="status-grid">
+            <div id="stat-0" class="player-status">K:<span id="p0-c">0</span> S:<span id="p0-sp">0</span> Sv:<span id="p0-s">0</span></div>
+            <div id="stat-1" class="player-status">K:<span id="p1-c">0</span> S:<span id="p1-sp">0</span> Sv:<span id="p1-s">0</span></div>
+            <div id="stat-2" class="player-status">K:<span id="p2-c">0</span> S:<span id="p2-sp">0</span> Sv:<span id="p2-s">0</span></div>
+            <div id="stat-3" class="player-status">K:<span id="p3-c">0</span> S:<span id="p3-sp">0</span> Sv:<span id="p3-s">0</span></div>
+        </div>
+
+        <div id="msg">Klar til spil</div>
+        <div id="table-cards" class="board"></div>
+        <div id="player-hand" class="hand"></div>
+
+        <div class="controls">
+            <button id="btn-take" onclick="tryTake()">Tag stik</button>
+            <button id="btn-build" onclick="openBuildMenu()">Byg</button>
+            <button id="btn-drop" onclick="tryDrop()">Læg ud</button>
+        </div>
+    </div>
+</div>
+
+<div id="setup-panel" class="setup-panel">
+    <h2 style="color:gold; margin:0 0 15px 0;">NYT SPIL</h2>
+    <div style="margin-bottom:15px; line-height: 2.2; font-size: 0.9rem;">
+        P1: <select id="type-0"><option value="human">Menneske</option><option value="cpu">CPU</option></select><br>
+        P2: <select id="type-1"><option value="cpu">CPU</option><option value="human">Menneske</option></select><br>
+        P3: <select id="type-2"><option value="cpu">CPU</option><option value="human">Menneske</option></select><br>
+        P4: <select id="type-3"><option value="cpu">CPU</option><option value="human">Menneske</option></select>
+    </div>
+    <button onclick="startGame()" style="width:100%; background:#27ae60;">START SPIL (21 PT)</button>
+</div>
+
+<div id="build-modal" class="modal" style="display:none;">
+    <h3 style="color:gold">Byg til:</h3>
+    <div id="build-btns-container" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;"></div>
+    <button onclick="closeBuildMenu()" style="background:grey; margin-top:15px; width:100%;">Annuller</button>
+</div>
+
+<script>
+    let deck = [], table = [], players = [[],[],[],[]], captured = [[],[],[],[]], svuppere = [0,0,0,0];
+    let totalScores = [0,0,0,0], turn = 0, lastWinner = 0, gameActive = false, playerTypes = [];
+    let selectedHand = null, selectedTable = [];
+    const SPEED = 800;
+
+    function createDeck() {
+        const suits = ['♠', '♥', '♦', '♣'], names = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+        deck = [];
+        suits.forEach(s => names.forEach((n, i) => {
+            let bv = i+1, av = bv, sp = "";
+            if (n === 'A') { bv = 1; av = 14; sp = "Es"; }
+            else if (s === '♦' && n === '10') { bv = 10; av = 16; sp = "Store"; }
+            else if (s === '♠' && n === '2') { bv = 2; av = 15; sp = "Lille"; }
+            else if (s === '♠' && n === '5') { sp = "Ryd"; }
+            deck.push({ suit: s, name: n, base: bv, alt: av, spec: sp, isBuild: false, buildVal: 0 });
+        }));
+        deck.sort(() => Math.random() - 0.5);
+    }
+
+    function render() {
+        const tDiv = document.getElementById('table-cards'); tDiv.innerHTML = '';
+        const pDiv = document.getElementById('player-hand'); pDiv.innerHTML = '';
+        table.forEach(c => createCardUI(c, tDiv, true));
+        if (gameActive && playerTypes[turn] === "human") {
+            players[turn].forEach(c => createCardUI(c, pDiv, false));
+        }
+        for(let i=0; i<4; i++) {
+            document.getElementById(`p${i}-c`).innerText = captured[i].length;
+            document.getElementById(`p${i}-sp`).innerText = captured[i].filter(k => k.suit === '♠').length;
+            document.getElementById(`p${i}-s`).innerText = svuppere[i];
+            document.getElementById(`total-${i}`).innerText = totalScores[i];
+            document.getElementById(`stat-${i}`).className = 'player-status' + (turn === i ? ' active-turn' : '');
+        }
+        const isH = gameActive && playerTypes[turn] === "human";
+        document.getElementById('btn-take').disabled = !isH;
+        document.getElementById('btn-build').disabled = !isH;
+        document.getElementById('btn-drop').disabled = !isH;
+    }
+
+    function createCardUI(card, container, isTable) {
+        const div = document.createElement('div');
+        div.className = `card ${(card.suit==='♥'||card.suit==='♦')?'red':''}`;
+        if (card.isBuild) div.classList.add('is-build');
+        if (isTable && selectedTable.includes(card)) div.classList.add('selected');
+        if (!isTable && selectedHand === card) div.classList.add('selected');
+        div.innerHTML = `<div>${card.isBuild ? card.buildVal : card.name}</div><div>${card.suit}</div>`;
+        if (card.spec && !card.isBuild) div.innerHTML += `<div class="special-badge">${card.spec}</div>`;
+        div.onclick = () => { if(playerTypes[turn]==='human'){ if(isTable){const idx=selectedTable.indexOf(card); idx>-1?selectedTable.splice(idx,1):selectedTable.push(card);}else{selectedHand=card;} render();}};
+        container.appendChild(div);
+    }
+
+    function getValidCombinations(cards, target) {
+        let results = [];
+        function helper(rem, cur, sum) {
+            if (sum === target) { results.push([...cur]); return; }
+            if (sum > target || rem.length === 0) return;
+            for (let i = 0; i < rem.length; i++) {
+                let v = rem[i].isBuild ? rem[i].buildVal : rem[i].base;
+                helper(rem.slice(i + 1), [...cur, rem[i]], sum + v);
+            }
+        }
+        helper(cards, [], 0);
+        return results;
+    }
+
+    // RETTET FUNKTION: Tjekker nu summen strengt
+    function tryTake() {
+        if (!selectedHand) return;
+        if (selectedHand.spec === "Ryd") { 
+            if (table.length > 0) performCapture([...table], true); 
+            return; 
+        }
+        if (selectedTable.length === 0) {
+            alert("Vælg kort på bordet først!");
+            return;
+        }
+        const checkMatch = (goal) => {
+            let temp = [...selectedTable];
+            let currentSum = temp.reduce((acc, c) => acc + (c.isBuild ? c.buildVal : c.base), 0);
+            if (currentSum === goal) return true;
+            let remaining = [...temp];
+            while(remaining.length > 0) {
+                let found = getValidCombinations(remaining, goal);
+                if (found.length === 0) return false;
+                let combo = found[0];
+                remaining = remaining.filter(c => !combo.includes(c));
+            }
+            return true;
+        };
+        if (checkMatch(selectedHand.base) || (selectedHand.alt !== selectedHand.base && checkMatch(selectedHand.alt))) {
+            performCapture(selectedTable);
+        } else alert("Kortene matcher ikke!");
+    }
+
+    function openBuildMenu() {
+        if (!selectedHand || selectedTable.length === 0) return;
+        const cont = document.getElementById('build-btns-container');
+        cont.innerHTML = '';
+        let tableSum = selectedTable.reduce((acc, c) => acc + (c.isBuild ? c.buildVal : c.base), 0);
+        let handTargets = [];
+        players[turn].forEach(c => { if(c !== selectedHand){ handTargets.push(c.base); if(c.alt!==c.base) handTargets.push(c.alt); }});
+        let valid = handTargets.filter(t => (selectedHand.base + tableSum === t) || (selectedHand.alt + tableSum === t) || (tableSum === t));
+        [...new Set(valid)].forEach(val => {
+            let b = document.createElement('button'); b.innerText = "Byg " + val;
+            b.onclick = () => {
+                table = table.filter(c => !selectedTable.includes(c));
+                table.push({ isBuild: true, buildVal: val, suit: 'BYG', name: val.toString() });
+                players[turn] = players[turn].filter(c => c !== selectedHand);
+                closeBuildMenu(); endMove("P" + (turn+1) + " byggede " + val);
+            };
+            cont.appendChild(b);
+        });
+        if (cont.innerHTML === '') return alert("Ulovligt byg!");
+        document.getElementById('build-modal').style.display = 'block';
+    }
+
+    function closeBuildMenu() { document.getElementById('build-modal').style.display = 'none'; }
+
+    function tryDrop() {
+        if (!selectedHand) return;
+        table.push(selectedHand);
+        players[turn] = players[turn].filter(c => c !== selectedHand);
+        endMove("P" + (turn+1) + " lagde ud");
+    }
+
+    function performCapture(cards, ryd = false) {
+        captured[turn].push(selectedHand, ...cards);
+        table = table.filter(c => !cards.includes(c));
+        players[turn] = players[turn].filter(c => c !== selectedHand);
+        lastWinner = turn;
+        if (ryd || table.length === 0) svuppere[turn]++;
+        endMove("P" + (turn+1) + " tog stik");
+    }
+
+    function cpuMove() {
+        if (!gameActive) return;
+        let h = players[turn];
+        let s5 = h.find(c => c.spec === "Ryd");
+        if (s5 && table.length > 0) { selectedHand = s5; performCapture([...table], true); return; }
+        for (let card of h) {
+            for (let v of [card.alt, card.base]) {
+                let combinations = getValidCombinations(table, v);
+                if (combinations.length > 0) { selectedHand = card; performCapture(combinations[0]); return; }
+            }
+        }
+        let card = h[0]; table.push(card);
+        players[turn] = players[turn].filter(k => k !== card);
+        endMove("P" + (turn+1) + " lagde ud");
+    }
+
+    function calculateRoundPoints() {
+        captured[lastWinner].push(...table); table = [];
+        let pts = [0,0,0,0], cCounts = captured.map(c => c.length), sCounts = captured.map(c => c.filter(k => k.suit === '♠').length);
+        let maxC = Math.max(...cCounts);
+        if (cCounts.filter(x => x === maxC).length === 1) pts[cCounts.indexOf(maxC)] += 1;
+        let maxS = Math.max(...sCounts);
+        if (sCounts.filter(x => x === maxS).length === 1) pts[sCounts.indexOf(maxS)] += 2;
+        for (let i = 0; i < 4; i++) {
+            captured[i].forEach(c => {
+                if (c.spec === "Es") pts[i] += 1;
+                if (c.spec === "Store") pts[i] += 2;
+                if (c.spec === "Lille") pts[i] += 1;
+            });
+            pts[i] += svuppere[i];
+        }
+        pts[lastWinner] += 1;
+        let res = "RUNDE SLUT!\n";
+        for(let i=0; i<4; i++) { totalScores[i] += pts[i]; res += `P${i+1}: +${pts[i]}p (Total: ${totalScores[i]})\n`; }
+        alert(res);
+        if (totalScores.some(s => s >= 21)) location.reload(); else nextFullRound();
+    }
+
+    function endMove(m) {
+        document.getElementById('msg').innerText = m;
+        selectedHand = null; selectedTable = []; render();
+        if (players.every(p => p.length === 0)) {
+            if (deck.length > 0) setTimeout(dealRound, SPEED);
+            else setTimeout(calculateRoundPoints, SPEED);
+            return;
+        }
+        turn = (turn + 1) % 4; render();
+        if (playerTypes[turn] === "cpu") setTimeout(cpuMove, SPEED);
+    }
+
+    function startGame() {
+        for(let i=0; i<4; i++) playerTypes[i] = document.getElementById(`type-${i}`).value;
+        document.getElementById('setup-panel').style.display = 'none';
+        gameActive = true; totalScores = [0,0,0,0]; nextFullRound();
+    }
+
+    function nextFullRound() {
+        createDeck(); table = []; players = [[],[],[],[]]; captured = [[],[],[],[]]; svuppere = [0,0,0,0];
+        for(let i=0; i<4; i++) table.push(deck.pop()); dealRound();
+    }
+
+    function dealRound() {
+        for(let i=0; i<4; i++) for(let p=0; p<4; p++) if(deck.length) players[p].push(deck.pop());
+        render(); if (playerTypes[turn] === "cpu") setTimeout(cpuMove, SPEED);
+    }
+</script>
+</body>
+</html>
